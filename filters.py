@@ -1,22 +1,5 @@
-"""Provide filters for querying close approaches and limit the generated results.
-
-The `create_filters` function produces a collection of objects that is used by
-the `query` method to generate a stream of `CloseApproach` objects that match
-all of the desired criteria. The arguments to `create_filters` are provided by
-the main module and originate from the user's command-line options.
-
-This function can be thought to return a collection of instances of subclasses
-of `AttributeFilter` - a 1-argument callable (on a `CloseApproach`) constructed
-from a comparator (from the `operator` module), a reference value, and a class
-method `get` that subclasses can override to fetch an attribute of interest from
-the supplied `CloseApproach`.
-
-The `limit` function simply limits the maximum number of values produced by an
-iterator.
-
-You'll edit this file in Tasks 3a and 3c.
-"""
 import operator
+import itertools
 
 
 class UnsupportedCriterionError(NotImplementedError):
@@ -38,6 +21,7 @@ class AttributeFilter:
     Concrete subclasses can override the `get` classmethod to provide custom
     behavior to fetch a desired attribute from the given `CloseApproach`.
     """
+
     def __init__(self, op, value):
         """Construct a new `AttributeFilter` from an binary predicate and a reference value.
 
@@ -72,11 +56,48 @@ class AttributeFilter:
         return f"{self.__class__.__name__}(op=operator.{self.op.__name__}, value={self.value})"
 
 
-def create_filters(date=None, start_date=None, end_date=None,
-                   distance_min=None, distance_max=None,
-                   velocity_min=None, velocity_max=None,
-                   diameter_min=None, diameter_max=None,
-                   hazardous=None):
+class DateFilter(AttributeFilter):
+    @classmethod
+    def get(cls, approach):
+        return approach.time.date()
+
+
+class DistanceFilter(AttributeFilter):
+    @classmethod
+    def get(cls, approach):
+        return approach.distance
+
+
+class VelocityFilter(AttributeFilter):
+    @classmethod
+    def get(cls, approach):
+        return approach.velocity
+
+
+class DiameterFilter(AttributeFilter):
+    @classmethod
+    def get(cls, approach):
+        return approach.neo.diameter
+
+
+class HazardousFilter(AttributeFilter):
+    @classmethod
+    def get(cls, approach):
+        return approach.neo.hazardous
+
+
+def create_filters(
+    date=None,
+    start_date=None,
+    end_date=None,
+    distance_min=None,
+    distance_max=None,
+    velocity_min=None,
+    velocity_max=None,
+    diameter_min=None,
+    diameter_max=None,
+    hazardous=None,
+):
     """Create a collection of filters from user-specified criteria.
 
     Each of these arguments is provided by the main module with a value from the
@@ -106,8 +127,32 @@ def create_filters(date=None, start_date=None, end_date=None,
     :param hazardous: Whether the NEO of a matching `CloseApproach` is potentially hazardous.
     :return: A collection of filters for use with `query`.
     """
-    # TODO: Decide how you will represent your filters.
-    return ()
+    # Collection of filters.
+    filter = []
+    try: 
+        if date:
+            filter.append(DateFilter(operator.eq, date))
+        if start_date:
+            filter.append(DateFilter(operator.ge, start_date))
+        if end_date:
+            filter.append(DateFilter(operator.le, end_date))
+        if distance_min:
+            filter.append(DistanceFilter(operator.ge, distance_min))
+        if distance_max:
+            filter.append(DistanceFilter(operator.le, distance_max))
+        if velocity_min:
+            filter.append(VelocityFilter(operator.ge, velocity_min))
+        if velocity_max:
+            filter.append(VelocityFilter(operator.le, velocity_max))
+        if diameter_min:
+            filter.append(DiameterFilter(operator.ge, diameter_min))
+        if diameter_max:
+            filter.append(DiameterFilter(operator.le, diameter_max))
+        if hazardous is not None:
+            filter.append(HazardousFilter(operator.eq, hazardous))
+        return filter
+    except:
+        return filter
 
 
 def limit(iterator, n=None):
@@ -119,5 +164,9 @@ def limit(iterator, n=None):
     :param n: The maximum number of values to produce.
     :yield: The first (at most) `n` values from the iterator.
     """
-    # TODO: Produce at most `n` values from the given iterator.
-    return iterator
+    # Produce at most `n` values from the given iterator.
+    if n == 0 or None:
+        return iterator
+    else:
+        iterator = itertools.islice(iterator, 0, n)
+        return iterator
